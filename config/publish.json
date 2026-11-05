@@ -1,0 +1,17 @@
+{
+  "_comment": "공개 화면에 내보낼 지표만 true. false인 지표는 API에서 가져오더라도 site/data/stats.js에 기록되지 않습니다.",
+  "followers": true,
+  "views30d": true,
+  "reach30d": true,
+  "topCarousels": {
+    "enabled": true,
+    "count": 3,
+    "rankBy": "views",
+    "scanLimit": 100,
+    "metrics": ["views", "reach", "saves", "shares", "likes", "comments"]
+  },
+  "audience": {
+    "age": true,
+    "gender": true
+  }
+}
