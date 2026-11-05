@@ -23,6 +23,7 @@ const DAY = 86400;
 
 // 입력창 하나를 계속 사용 (Windows에서 여러 번 열고 닫으면 붙여 넣은 글자가 셸로 새어 나감)
 const DEFAULT_APP_ID = process.env.META_APP_ID || "998439419986518";
+const DEFAULT_IG_ID = process.env.IG_USER_ID || "17841427055425139";
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
 let muted = false;
 rl._writeToOutput = (s) => { if (!muted) rl.output.write(s); };
@@ -77,6 +78,7 @@ async function verify(host, igId, token) {
   }).catch((e) => ({ error: e.message }));
   if (reach.error) console.warn(`! 30일 도달 확인 실패: ${reach.error}`);
   else console.log(`✓ 30일 도달 계정 ${reach?.data?.[0]?.total_value?.value}`);
+  return { username: prof.username, insights: !reach.error };
 }
 
 async function main() {
@@ -112,7 +114,15 @@ async function main() {
   let pageToken = null;
   let ig = null;
 
-  if (dbg.type === "PAGE") {
+  const scopes = dbg.scopes || [];
+  const hasInsights = scopes.some((x) => /manage_insights/.test(x));
+
+  if (dbg.type === "SYSTEM_USER") {
+    // 시스템 사용자 토큰은 만료가 없고 Instagram 계정에 바로 접근 → 계정 ID만 확인
+    const igId = (await ask(`Instagram 계정 ID (그냥 Enter = ${DEFAULT_IG_ID}): `)) || DEFAULT_IG_ID;
+    ig = { id: igId };
+    pageToken = token;
+  } else if (dbg.type === "PAGE") {
     const me = await fb("me", { fields: "name,instagram_business_account{id,username}", access_token: token });
     ig = me.instagram_business_account;
     pageToken = token;
@@ -139,12 +149,18 @@ async function main() {
   }
 
   const pdbg = (await fb("debug_token", { input_token: pageToken, access_token: appToken })).data || {};
-  console.log(`✓ 페이지 토큰 · ${fmtExpiry(pdbg.expires_at)} · Instagram 계정 ID ${ig.id}`);
+  console.log(`✓ 저장할 토큰 · ${pdbg.type} · ${fmtExpiry(pdbg.expires_at)} · Instagram 계정 ID ${ig.id}`);
 
-  await verify("graph.facebook.com", ig.id, pageToken);
+  const v = await verify("graph.facebook.com", ig.id, pageToken);
+  if (v.username !== HANDLE) console.warn(`! 연결된 계정이 @${v.username} 입니다. (@${HANDLE} 가 맞는지 확인하세요)`);
   saveSecret("IG_ACCESS_TOKEN", pageToken);
   saveSecret("IG_USER_ID", ig.id);
-  console.log("\n완료! GitHub Actions 가 매일 09:00(KST)에 이 토큰으로 지표를 갱신합니다.");
+  console.log("\n완료! GitHub Actions 가 매일 09:00(KST)에 이 토큰으로 팔로워 수를 갱신합니다.");
+  if (!v.insights || !hasInsights) {
+    console.warn("\n! 이 토큰에는 인사이트 권한(instagram_manage_insights)이 없어 조회수·도달·성별/연령은 직접 입력값이 유지됩니다.");
+    console.warn("  Meta 앱 → Use cases → Instagram API → Permissions and features 에서 instagram_manage_insights 를 Add 한 뒤");
+    console.warn("  토큰을 다시 생성하고 이 도우미를 한 번 더 실행하면 인사이트까지 자동 갱신됩니다.");
+  }
   return 0;
 }
 
