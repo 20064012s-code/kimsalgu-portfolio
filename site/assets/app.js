@@ -350,7 +350,12 @@
       list.push(x);
     });
     list = list.slice(0, MAX_FEATURED);
-    if (!list.length) return;
+    if (!list.length) {
+      // 대표 콘텐츠가 없으면 상단 메뉴의 링크도 숨김
+      var nav = document.querySelector('.topnav a[href="#featured-section"]');
+      if (nav) nav.hidden = true;
+      return;
+    }
 
     $("featured-section").hidden = false;
     if (api.length) $("featured-title").textContent = "성과 좋은 캐러셀 · 대표 콘텐츠";
