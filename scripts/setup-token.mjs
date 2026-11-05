@@ -23,7 +23,6 @@ const DAY = 86400;
 
 // 입력창 하나를 계속 사용 (Windows에서 여러 번 열고 닫으면 붙여 넣은 글자가 셸로 새어 나감)
 const DEFAULT_APP_ID = process.env.META_APP_ID || "998439419986518";
-const DEFAULT_IG_ID = process.env.IG_USER_ID || "17841427055425139";
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
 let muted = false;
 rl._writeToOutput = (s) => { if (!muted) rl.output.write(s); };
@@ -118,9 +117,17 @@ async function main() {
   const hasInsights = scopes.some((x) => /manage_insights/.test(x));
 
   if (dbg.type === "SYSTEM_USER") {
-    // 시스템 사용자 토큰은 만료가 없고 Instagram 계정에 바로 접근 → 계정 ID만 확인
-    const igId = (await ask(`Instagram 계정 ID (그냥 Enter = ${DEFAULT_IG_ID}): `)) || DEFAULT_IG_ID;
-    ig = { id: igId };
+    // Unified login 의 시스템 사용자 토큰: 만료가 없고, 시스템 사용자에게 할당된 Instagram 계정에 접근
+    const assigned = (await fb("me/assigned_instagram_accounts", { fields: "id,username", access_token: token }).catch(() => ({}))).data || [];
+    console.log(`· 할당된 Instagram 계정 ${assigned.length}개: ${assigned.map((a) => "@" + a.username).join(", ") || "없음"}`);
+    const hit = assigned.find((a) => a.username === HANDLE) || assigned[0];
+    if (!hit) {
+      console.error(`\n✗ 시스템 사용자에게 @${HANDLE} 계정이 할당되지 않았습니다.`);
+      console.error("  Facebook Login for Business 제품을 추가하고, 구성(Configuration)에 business_management·instagram_manage_insights");
+      console.error("  권한을 넣은 뒤 Generate token 으로 다시 로그인해 주세요.");
+      return 1;
+    }
+    ig = { id: hit.id };
     pageToken = token;
   } else if (dbg.type === "PAGE") {
     const me = await fb("me", { fields: "name,instagram_business_account{id,username}", access_token: token });
