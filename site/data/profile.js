@@ -26,7 +26,7 @@ window.SALGU_PROFILE = {
 
   // 첫 화면 핵심 수치 (직접 입력값)
   stats: {
-    followers: { value: 7797, asOf: "2026-11-06" },
+    followers: { value: 7804, asOf: "2026-11-06" },
     // 최근 30일 도달 계정 수 — 인사이트의 ‘Viewers’ 값 = 중복 제거된 계정 수
     reach30d: { value: 1743060, periodStart: "2026-09-23", periodEnd: "2026-10-22" },
   },
