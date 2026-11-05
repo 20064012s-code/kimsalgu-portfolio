@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 /**
- * Instagram API(Instagram 로그인 방식)로 공개용 지표를 가져와 site/data/stats.js 를 만듭니다.
+ * Instagram API로 공개용 지표를 가져와 site/data/stats.js 를 만듭니다.
+ * Instagram 로그인 토큰(IG…)과 Facebook 로그인 토큰(EAA…, 페이지 토큰) 둘 다 지원합니다.
  *
  * 필요 환경 변수
- *   IG_ACCESS_TOKEN        장기 액세스 토큰 (instagram_business_basic, instagram_business_manage_insights)
+ *   IG_ACCESS_TOKEN        IG… 장기 토큰 또는 EAA… 페이지 토큰 (scripts/setup-token.mjs 로 저장)
+ *   IG_USER_ID             EAA… 토큰일 때 필수. Instagram 비즈니스 계정 ID
  *   IG_API_VERSION         선택. 기본 v27.0
- *   IG_REFRESH_TOKEN_OUT   선택. 경로를 주면 토큰을 갱신해 새 토큰을 그 파일에 저장 (워크플로가 Secret 교체에 사용)
+ *   IG_REFRESH_TOKEN_OUT   선택. IG… 토큰일 때만, 토큰을 갱신해 새 토큰을 그 파일에 저장 (워크플로가 Secret 교체에 사용)
  *
  * 원칙
  *   - config/publish.json 에서 공개하기로 한 지표만 기록합니다.
@@ -25,11 +27,19 @@ const MEDIA_URL_PREFIX = "data/media/";
 
 const TOKEN = process.env.IG_ACCESS_TOKEN;
 const VERSION = process.env.IG_API_VERSION || "v27.0";
-const BASE = `https://graph.instagram.com/${VERSION}`;
 const DAY = 86400;
 
 if (!TOKEN) {
   console.error("IG_ACCESS_TOKEN 이 없습니다. 직접 입력값(site/data/profile.js)만으로 사이트가 표시됩니다.");
+  process.exit(1);
+}
+
+// EAA… = Facebook 로그인 토큰 → graph.facebook.com/{IG 계정 ID}
+const IS_FB = TOKEN.startsWith("EAA");
+const BASE = `https://${IS_FB ? "graph.facebook.com" : "graph.instagram.com"}/${VERSION}`;
+const IG = process.env.IG_USER_ID || "me";
+if (IS_FB && IG === "me") {
+  console.error("Facebook 로그인 토큰(EAA…)에는 IG_USER_ID 가 필요합니다. scripts/setup-token.mjs 를 실행하세요.");
   process.exit(1);
 }
 
@@ -70,17 +80,17 @@ const since = until - 30 * DAY;
 
 /* ---------- 지표 ---------- */
 async function fetchProfile() {
-  return api("me", { fields: "user_id,username,followers_count" });
+  return api(IG, { fields: IS_FB ? "id,username,followers_count" : "user_id,username,followers_count" });
 }
 
 async function fetchReach30d() {
-  const total = await api("me/insights", { metric: "reach", period: "day", metric_type: "total_value", since, until });
+  const total = await api(`${IG}/insights`, { metric: "reach", period: "day", metric_type: "total_value", since, until });
   const value = total?.data?.[0]?.total_value?.value;
   if (typeof value !== "number") throw new Error("total_value 응답에 값이 없습니다");
 
   // 일별 합계와 비교해 중복 제거 여부를 확인 (합계를 공개하지는 않음)
   const series = await attempt("reach 일별 값(검증용)", () =>
-    api("me/insights", { metric: "reach", period: "day", metric_type: "time_series", since, until })
+    api(`${IG}/insights`, { metric: "reach", period: "day", metric_type: "time_series", since, until })
   );
   const daily = series?.data?.[0]?.values?.map((v) => v.value).filter((v) => typeof v === "number") || [];
   const dailySum = daily.reduce((a, b) => a + b, 0);
@@ -92,7 +102,7 @@ async function fetchReach30d() {
 
 // 조회수는 중복 제거 개념이 없는 횟수 지표라 기간 total_value 를 그대로 사용
 async function fetchViews30d() {
-  const res = await api("me/insights", { metric: "views", period: "day", metric_type: "total_value", since, until });
+  const res = await api(`${IG}/insights`, { metric: "views", period: "day", metric_type: "total_value", since, until });
   const value = res?.data?.[0]?.total_value?.value;
   if (typeof value !== "number") throw new Error("views total_value 응답에 값이 없습니다");
   return { value, periodStart: kstDate(since), periodEnd: kstDate(until - DAY) };
@@ -149,7 +159,7 @@ async function fetchTopCarousels(cfg) {
   const scanLimit = cfg.scanLimit || 100;
 
   const fields = "id,media_type,caption,permalink,timestamp,media_url,thumbnail_url,children{media_type,media_url,thumbnail_url}";
-  let page = await api("me/media", { fields, limit: 50 });
+  let page = await api(`${IG}/media`, { fields, limit: 50 });
   const carousels = [];
   let scanned = 0;
   while (page) {
@@ -187,7 +197,7 @@ async function fetchTopCarousels(cfg) {
 
 const GENDER = { F: "여성", M: "남성", U: "미상" };
 async function fetchDemographic(breakdown) {
-  const res = await api("me/insights", {
+  const res = await api(`${IG}/insights`, {
     metric: "follower_demographics",
     period: "lifetime",
     metric_type: "total_value",
@@ -261,7 +271,7 @@ if ((audience.age || []).length || (audience.gender || []).length) {
   ok++;
 }
 
-if (process.env.IG_REFRESH_TOKEN_OUT) await attempt("토큰 갱신", () => refreshToken(process.env.IG_REFRESH_TOKEN_OUT));
+if (process.env.IG_REFRESH_TOKEN_OUT && !IS_FB) await attempt("토큰 갱신", () => refreshToken(process.env.IG_REFRESH_TOKEN_OUT));
 
 if (!ok) {
   console.error("가져온 공개 지표가 없어 기존 stats.js 를 유지합니다.");
