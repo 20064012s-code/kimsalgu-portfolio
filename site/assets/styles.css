@@ -63,8 +63,25 @@ b { color: var(--ink); }
 
 .eyebrow { font-size: 15px; font-weight: 700; color: var(--muted); margin-bottom: 14px; }
 
+/* 계정 게재 광고 ↔ 광고 소재 납품 전환 */
+.switch { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; max-width: 560px; margin-bottom: 48px; padding: 6px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.switch a { display: block; padding: 14px 18px; border-radius: 11px; text-decoration: none; color: var(--ink-2); transition: background .15s ease, color .15s ease; }
+.switch a b { display: block; color: inherit; font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
+.switch a span { display: block; margin-top: 2px; font-size: 13px; color: var(--muted); }
+.switch a:hover:not([aria-current]) { background: var(--surface-2); color: var(--ink); }
+.switch a:not([aria-current]) b::after { content: " →"; color: var(--accent); }
+.switch a[aria-current="page"] { background: var(--accent); color: var(--accent-ink); }
+.switch a[aria-current="page"] span { color: rgba(11, 11, 13, .7); }
+.switch a:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+@media (max-width: 760px) {
+  .switch { margin-bottom: 28px; }
+  .switch a { padding: 12px 12px; }
+  .switch a b { font-size: 16px; }
+  .switch a span { font-size: 12px; }
+}
+
 /* ---------- hero ---------- */
-.hero { padding: 80px 0 96px; }
+.hero { padding: 48px 0 96px; }
 .hero__grid { display: grid; grid-template-columns: 1.25fr .75fr; gap: 48px; align-items: center; }
 .hero__title { font-size: clamp(34px, 4.6vw, 58px); font-weight: 800; letter-spacing: -0.04em; line-height: 1.2; }
 .hero__sub { margin-top: 22px; font-size: 18px; color: var(--muted); }
@@ -207,7 +224,7 @@ b { color: var(--ink); }
   :root { --gutter: 16px; --blk: 26px; }
   body { font-size: 16px; }
   .topnav a:not(.btn) { display: none; }
-  .hero { padding: 36px 0 64px; }
+  .hero { padding: 24px 0 64px; }
   .hero__grid { grid-template-columns: 1fr; gap: 28px; }
   .hero__visual { order: -1; justify-self: start; max-width: 200px; }
   .hero__sub { font-size: 15px; margin-top: 16px; }
